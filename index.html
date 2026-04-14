@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker Security</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<style>
+  :root { --amber:#f5a623; --green:#4ecb8d; --purple:#a78bfa; --blue:#60a5fa; --red:#f87171; --bg:#0a0a0f; --bg2:#10101a; --bg3:#181824; --border:#2a2a3a; --text:#e8e8f0; --muted:#8888a8; }
+  .reveal-viewport { background: var(--bg); }
+  .reveal .slides section { background: transparent; }
+  .reveal { font-family: 'DM Sans', sans-serif; color: var(--text); }
+  .reveal h1,.reveal h2,.reveal h3 { font-family: 'Playfair Display', serif; font-weight: 700; }
+  .reveal h1 { font-size: 1.6em; color: var(--amber); line-height: 1.1; }
+  .reveal h2 { font-size: 1.1em; color: var(--amber); margin-bottom: .2em; }
+  .reveal h3 { font-size: .78em; color: var(--green); margin-bottom: .15em; }
+  .reveal p { font-size: .56em; line-height: 1.45; color: var(--text); }
+  .reveal li { font-size: .54em; line-height: 1.45; margin-bottom: .1em; }
+  .reveal code { font-family: 'JetBrains Mono', monospace; font-size: .72em; }
+  .reveal pre { box-shadow: none; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: .3em .5em; margin: .25em 0; }
+  .reveal pre code { font-size: .52em; line-height: 1.35; background: transparent; color: #cdd6f4; }
+  .slide-hdr { display: flex; align-items: center; gap: .4em; border-bottom: 1px solid var(--border); padding-bottom: .2em; margin-bottom: .3em; }
+  .slide-hdr .tag { font-family: 'JetBrains Mono', monospace; font-size: .42em; font-weight: 500; color: var(--bg); background: var(--amber); padding: .1em .4em; border-radius: 3px; letter-spacing: .04em; }
+  .slide-hdr h2 { margin: 0; font-size: .95em; }
+  .cols { display: grid; gap: .5em; } .cols-2 { grid-template-columns: 1fr 1fr; } .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: .35em .6em; }
+  .card.amber { border-left: 3px solid var(--amber); } .card.green { border-left: 3px solid var(--green); }
+  .card.purple { border-left: 3px solid var(--purple); } .card.blue { border-left: 3px solid var(--blue); }
+  .card.red { border-left: 3px solid var(--red); }
+  .card h3 { font-size: .64em; margin: 0 0 .12em; } .card p { font-size: .52em; margin: 0; color: #b8b8d0; }
+  .card ul { margin: 0; padding-left: 1em; } .card li { font-size: .52em; color: #b8b8d0; margin-bottom: .02em; }
+  .reveal table { width: 100%; border-collapse: collapse; font-size: .5em; }
+  .reveal table th { background: var(--bg3); color: var(--amber); font-weight: 600; padding: .2em .4em; border: 1px solid var(--border); text-align: left; }
+  .reveal table td { padding: .18em .4em; border: 1px solid var(--border); color: #ccc; }
+  .reveal table tr:nth-child(even) td { background: #0e0e18; }
+  .a { color: var(--amber); font-weight: 600; } .g { color: var(--green); font-weight: 600; }
+  .p { color: var(--purple); font-weight: 600; } .b { color: var(--blue); font-weight: 600; }
+  .r { color: var(--red); font-weight: 600; } .mono { font-family: 'JetBrains Mono', monospace; }
+  .pill { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: .44em; padding: .08em .4em; border-radius: 99px; border: 1px solid; margin: 0 .08em; }
+  .pill.amber { color: var(--amber); border-color: var(--amber); } .pill.green { color: var(--green); border-color: var(--green); }
+  .pill.purple { color: var(--purple); border-color: var(--purple); } .pill.blue { color: var(--blue); border-color: var(--blue); }
+  .reveal .slide-footer { display: none; }
+  .title-slide h1 { font-size: 1.8em; }
+  .title-slide .subtitle { font-size: .7em; color: var(--green); font-family: 'DM Sans', sans-serif; font-weight: 300; letter-spacing: .04em; margin: .3em 0 .6em; }
+  .title-slide .meta { font-size: .48em; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .ss-row { display: flex; gap: .25em; align-items: center; margin: .1em 0; font-size: .55em; font-family: 'JetBrains Mono', monospace; }
+  .ss-node { padding: .2em .55em; border-radius: 5px; font-size: .9em; background: var(--bg3); border: 1px solid var(--border); color: var(--text); }
+  .ss-node.active { background: #1a2a1a; border-color: var(--green); color: var(--green); }
+  .ss-node.done { background: #1a1a2a; border-color: var(--purple); color: var(--purple); }
+  .ss-arrow { color: var(--amber); }
+  .reveal ul, .reveal ol { margin: .15em 0 .15em 1em; }
+  .reveal .slides > section { display: flex !important; flex-direction: column !important; overflow-y: auto !important; align-items: stretch !important; justify-content: flex-start !important; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ============ SLIDE 1 — TITLE ============ -->
+<section class="title-slide">
+  <h1>Docker Security</h1>
+  <div class="subtitle">Hardening Containers from Build to Runtime</div>
+  <p>
+    <span class="pill amber">Security</span>
+    <span class="pill green">Hardening</span>
+    <span class="pill purple">Scanning</span>
+    <span class="pill blue">DevSecOps</span>
+  </p>
+  <p class="meta">2026 &middot; Container Security Best Practices</p>
+</section>
+
+<!-- ============ SLIDE 2 — WHY DOCKER SECURITY MATTERS ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">01</span>
+    <h2>Why Docker Security Matters</h2>
+  </div>
+  <p>Containers share the host kernel -- a misconfigured container can compromise the entire host. Security must be addressed at every layer: image, build, runtime, network, and orchestration.</p>
+  <div class="cols cols-3">
+    <div class="card red">
+      <h3>Container Escapes</h3>
+      <p>Privileged containers or kernel exploits can break isolation boundaries</p>
+    </div>
+    <div class="card amber">
+      <h3>Supply Chain Attacks</h3>
+      <p>Malicious base images or compromised dependencies injected at build time</p>
+    </div>
+    <div class="card purple">
+      <h3>Data Exposure</h3>
+      <p>Secrets, credentials, and sensitive data leaked through images or logs</p>
+    </div>
+  </div>
+  <p style="margin-top:.3em;">According to Sysdig's 2025 Container Security Report, <span class="r">87%</span> of container images contain high or critical vulnerabilities.</p>
+</section>
+
+<!-- ============ SLIDE 3 — CONTAINER ATTACK SURFACE ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">02</span>
+    <h2>Container Attack Surface Overview</h2>
+  </div>
+  <div class="ss-row">
+    <span class="ss-node">Image</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node">Build</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node">Registry</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node active">Runtime</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node">Network</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node">Orchestration</span>
+  </div>
+  <div class="cols cols-2" style="margin-top:.3em;">
+    <div class="card amber">
+      <h3>Host-Level Vectors</h3>
+      <ul>
+        <li>Shared kernel vulnerabilities (CVEs)</li>
+        <li>Docker daemon running as root</li>
+        <li>Mounted host filesystems (<code>/var/run/docker.sock</code>)</li>
+        <li>Excessive Linux capabilities</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <h3>Container-Level Vectors</h3>
+      <ul>
+        <li>Vulnerable packages in base images</li>
+        <li>Hardcoded secrets in layers</li>
+        <li>Running processes as root (UID 0)</li>
+        <li>Unrestricted network access between containers</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 4 — IMAGE SECURITY ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">03</span>
+    <h2>Image Security &amp; Vulnerability Scanning</h2>
+  </div>
+  <p>Start with <span class="g">minimal base images</span> and scan every layer for known CVEs before deployment.</p>
+  <div class="cols cols-2">
+    <div class="card green">
+      <h3>Base Image Selection</h3>
+      <ul>
+        <li>Use <code>alpine</code>, <code>distroless</code>, or <code>chainguard</code> images</li>
+        <li>Pin image digests, not just tags</li>
+        <li>Avoid <code>:latest</code> -- use explicit versions</li>
+        <li>Rebuild images regularly to pick up patches</li>
+      </ul>
+    </div>
+    <div class="card purple">
+      <h3>Scanning Tools</h3>
+      <ul>
+        <li><span class="a">Trivy</span> -- fast, comprehensive, OSS</li>
+        <li><span class="a">Snyk</span> -- developer-focused, CI integration</li>
+        <li><span class="a">Grype</span> -- Anchore's OSS scanner</li>
+        <li><span class="a">Docker Scout</span> -- built into Docker Desktop</li>
+      </ul>
+    </div>
+  </div>
+  <pre><code class="language-bash"># Scan an image with Trivy
+trivy image --severity HIGH,CRITICAL myapp:latest
+
+# Scan with Snyk
+snyk container test myapp:latest --severity-threshold=high</code></pre>
+</section>
+
+<!-- ============ SLIDE 5 — DOCKERFILE BEST PRACTICES ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">04</span>
+    <h2>Dockerfile Security Best Practices</h2>
+  </div>
+  <div class="cols cols-2">
+    <div class="card amber">
+      <h3>Do</h3>
+      <ul>
+        <li>Use multi-stage builds to exclude build tools</li>
+        <li>Pin package versions explicitly</li>
+        <li>Remove caches: <code>rm -rf /var/cache/apt/*</code></li>
+        <li>Use <code>COPY</code> instead of <code>ADD</code></li>
+        <li>Add a <code>.dockerignore</code> file</li>
+        <li>Use <code>HEALTHCHECK</code> instructions</li>
+      </ul>
+    </div>
+    <div class="card red">
+      <h3>Don't</h3>
+      <ul>
+        <li>Store secrets in <code>ENV</code> or <code>ARG</code></li>
+        <li>Run <code>apt-get upgrade</code> (non-reproducible)</li>
+        <li>Use <code>:latest</code> tags for base images</li>
+        <li>Install unnecessary packages</li>
+        <li>Leave package managers in final image</li>
+        <li>Use <code>chmod 777</code> anywhere</li>
+      </ul>
+    </div>
+  </div>
+  <pre><code class="language-dockerfile"># Multi-stage build example
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+FROM gcr.io/distroless/nodejs20-debian12
+COPY --from=builder /app /app
+USER nonroot
+CMD ["app/server.js"]</code></pre>
+</section>
+
+<!-- ============ SLIDE 6 — RUNNING AS NON-ROOT ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">05</span>
+    <h2>Running as Non-Root Users</h2>
+  </div>
+  <p>By default, containers run as <span class="r">root (UID 0)</span>. If an attacker escapes the container, they have root on the host. Always run as a non-root user.</p>
+  <div class="cols cols-2">
+    <div class="card green">
+      <h3>In the Dockerfile</h3>
+      <pre><code class="language-dockerfile"># Create a dedicated user
+RUN addgroup -S appgroup && \
+    adduser -S appuser -G appgroup
+
+# Set ownership and switch
+COPY --chown=appuser:appgroup . /app
+USER appuser</code></pre>
+    </div>
+    <div class="card blue">
+      <h3>At Runtime</h3>
+      <pre><code class="language-bash"># Override user at run time
+docker run --user 1000:1000 myapp
+
+# Verify running user
+docker exec mycontainer whoami
+# Output: appuser
+
+# Check with id
+docker exec mycontainer id
+# uid=1000 gid=1000</code></pre>
+    </div>
+  </div>
+  <p><span class="a">Tip:</span> Use <code>--user</code> flag even if the Dockerfile sets <code>USER</code> -- defence in depth.</p>
+</section>
+
+<!-- ============ SLIDE 7 — READ-ONLY FILESYSTEMS ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">06</span>
+    <h2>Read-Only Filesystems</h2>
+  </div>
+  <p>Prevent attackers from writing malicious files, scripts, or binaries into the container filesystem at runtime.</p>
+  <pre><code class="language-bash"># Run with read-only root filesystem
+docker run --read-only myapp
+
+# Allow specific writable paths with tmpfs
+docker run --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --tmpfs /var/run:rw,noexec,nosuid \
+  myapp</code></pre>
+  <div class="cols cols-2" style="margin-top:.2em;">
+    <div class="card green">
+      <h3>Benefits</h3>
+      <ul>
+        <li>Prevents malware installation</li>
+        <li>Blocks reverse shells writing to disk</li>
+        <li>Enforces immutable infrastructure</li>
+        <li>Catches apps that write unexpectedly</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>Considerations</h3>
+      <ul>
+        <li>Apps may need writable <code>/tmp</code> or log dirs</li>
+        <li>Use <code>tmpfs</code> mounts with <code>noexec</code> flag</li>
+        <li>Test thoroughly before production</li>
+        <li>Combine with <code>--no-new-privileges</code></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 8 — DOCKER SECRETS ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">07</span>
+    <h2>Docker Secrets Management</h2>
+  </div>
+  <p>Never bake secrets into images. Use runtime secret injection mechanisms to provide credentials securely.</p>
+  <div class="cols cols-3">
+    <div class="card red">
+      <h3>Never Do This</h3>
+      <pre><code class="language-dockerfile">ENV DB_PASS=s3cret
+# Visible in image history!
+# docker history myimg</code></pre>
+    </div>
+    <div class="card green">
+      <h3>Docker Swarm Secrets</h3>
+      <pre><code class="language-bash">echo "s3cret" | docker \
+  secret create db_pass -
+
+# Mounted at /run/secrets/
+# in-memory tmpfs, never on disk</code></pre>
+    </div>
+    <div class="card blue">
+      <h3>BuildKit Secrets</h3>
+      <pre><code class="language-dockerfile"># syntax=docker/dockerfile:1
+RUN --mount=type=secret,\
+  id=mysecret \
+  cat /run/secrets/mysecret</code></pre>
+    </div>
+  </div>
+  <p style="margin-top:.2em;"><span class="a">Production:</span> Use external vaults -- <span class="p">HashiCorp Vault</span>, <span class="b">AWS Secrets Manager</span>, <span class="g">Azure Key Vault</span> -- and inject at runtime via environment or mounted files.</p>
+</section>
+
+<!-- ============ SLIDE 9 — CAPABILITIES & SECCOMP ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">08</span>
+    <h2>Linux Capabilities &amp; Seccomp Profiles</h2>
+  </div>
+  <p>Docker grants containers a <span class="a">subset of Linux capabilities</span> by default. Reduce the attack surface by dropping all and adding only what is needed.</p>
+  <div class="cols cols-2">
+    <div class="card amber">
+      <h3>Capabilities</h3>
+      <pre><code class="language-bash"># Drop all capabilities, add only needed
+docker run --cap-drop=ALL \
+  --cap-add=NET_BIND_SERVICE \
+  --cap-add=CHOWN \
+  myapp
+
+# NEVER use --privileged in production
+# It grants ALL 40+ capabilities</code></pre>
+    </div>
+    <div class="card purple">
+      <h3>Seccomp Profiles</h3>
+      <pre><code class="language-bash"># Use Docker's default seccomp profile
+# (blocks ~44 of 300+ syscalls)
+
+# Apply a custom profile
+docker run --security-opt \
+  seccomp=custom-profile.json \
+  myapp
+
+# Check current profile
+docker inspect --format \
+  '{{.HostConfig.SecurityOpt}}' ctr</code></pre>
+    </div>
+  </div>
+  <table style="margin-top:.2em;">
+    <tr><th>Capability</th><th>Purpose</th><th>Risk if Granted</th></tr>
+    <tr><td><code>SYS_ADMIN</code></td><td>Mount filesystems, namespaces</td><td class="r">Critical -- near root</td></tr>
+    <tr><td><code>NET_RAW</code></td><td>Raw sockets, ping</td><td class="a">Network spoofing</td></tr>
+    <tr><td><code>SYS_PTRACE</code></td><td>Debug processes</td><td class="a">Process injection</td></tr>
+    <tr><td><code>NET_BIND_SERVICE</code></td><td>Bind ports &lt;1024</td><td class="g">Low risk</td></tr>
+  </table>
+</section>
+
+<!-- ============ SLIDE 10 — APPARMOR & SELINUX ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">09</span>
+    <h2>AppArmor &amp; SELinux</h2>
+  </div>
+  <p>Mandatory Access Control (MAC) systems add a <span class="g">kernel-level enforcement layer</span> beyond standard Unix permissions.</p>
+  <div class="cols cols-2">
+    <div class="card blue">
+      <h3>AppArmor (Ubuntu/Debian)</h3>
+      <ul>
+        <li>Docker loads <code>docker-default</code> profile automatically</li>
+        <li>Restricts mount, ptrace, and signal operations</li>
+        <li>Custom profiles for fine-grained control</li>
+      </ul>
+      <pre><code class="language-bash"># Apply custom AppArmor profile
+docker run --security-opt \
+  apparmor=my-custom-profile \
+  myapp</code></pre>
+    </div>
+    <div class="card green">
+      <h3>SELinux (RHEL/Fedora)</h3>
+      <ul>
+        <li>Labels containers with <code>container_t</code> type</li>
+        <li>Prevents containers accessing host files</li>
+        <li>MCS (Multi-Category Security) isolates containers</li>
+      </ul>
+      <pre><code class="language-bash"># Run with SELinux labelling
+docker run --security-opt \
+  label=type:container_t \
+  myapp
+
+# Disable (not recommended)
+# --security-opt label=disable</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 11 — NETWORK SECURITY ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">10</span>
+    <h2>Network Security &amp; Isolation</h2>
+  </div>
+  <p>By default, all containers on the same bridge network can communicate. Use <span class="a">network segmentation</span> to enforce least-privilege communication.</p>
+  <div class="cols cols-2">
+    <div class="card amber">
+      <h3>Network Segmentation</h3>
+      <pre><code class="language-bash"># Create isolated networks
+docker network create --internal backend
+docker network create frontend
+
+# Frontend can reach internet
+docker run --network frontend web
+
+# Backend is internal-only
+docker run --network backend db</code></pre>
+    </div>
+    <div class="card purple">
+      <h3>Additional Controls</h3>
+      <ul>
+        <li>Disable inter-container communication:<br><code>--icc=false</code> in daemon config</li>
+        <li>Use <code>--network=none</code> for offline containers</li>
+        <li>Never expose Docker API on <code>0.0.0.0:2375</code></li>
+        <li>Use TLS for Docker daemon remote access</li>
+        <li>Restrict published ports: <code>-p 127.0.0.1:8080:80</code></li>
+      </ul>
+    </div>
+  </div>
+  <pre><code class="language-yaml"># docker-compose.yml -- network isolation
+services:
+  web:
+    networks: [frontend, backend]
+  api:
+    networks: [backend]
+  db:
+    networks: [backend]
+networks:
+  frontend:
+  backend:
+    internal: true</code></pre>
+</section>
+
+<!-- ============ SLIDE 12 — CONTENT TRUST & IMAGE SIGNING ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">11</span>
+    <h2>Content Trust &amp; Image Signing</h2>
+  </div>
+  <p>Verify that images have not been tampered with between build and deployment using <span class="g">cryptographic signatures</span>.</p>
+  <div class="cols cols-2">
+    <div class="card green">
+      <h3>Docker Content Trust (DCT)</h3>
+      <pre><code class="language-bash"># Enable content trust globally
+export DOCKER_CONTENT_TRUST=1
+
+# Push a signed image
+docker push myregistry/myapp:v1.2
+
+# Pull only signed images
+docker pull myregistry/myapp:v1.2
+# Fails if unsigned!</code></pre>
+    </div>
+    <div class="card blue">
+      <h3>Cosign (Sigstore)</h3>
+      <pre><code class="language-bash"># Generate a key pair
+cosign generate-key-pair
+
+# Sign an image
+cosign sign --key cosign.key \
+  myregistry/myapp@sha256:abc...
+
+# Verify before deployment
+cosign verify --key cosign.pub \
+  myregistry/myapp@sha256:abc...</code></pre>
+    </div>
+  </div>
+  <p><span class="a">Best Practice:</span> Enforce signature verification in your CI/CD pipeline and admission controllers (e.g., Kyverno, OPA Gatekeeper).</p>
+</section>
+
+<!-- ============ SLIDE 13 — RUNTIME SECURITY MONITORING ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">12</span>
+    <h2>Runtime Security Monitoring</h2>
+  </div>
+  <p>Detect anomalous behaviour in running containers -- unexpected processes, file access, network connections, and syscalls.</p>
+  <div class="cols cols-3">
+    <div class="card amber">
+      <h3>Falco</h3>
+      <ul>
+        <li>CNCF project, eBPF-based</li>
+        <li>Detects shell in container</li>
+        <li>Alerts on sensitive file reads</li>
+        <li>Custom rules engine</li>
+      </ul>
+    </div>
+    <div class="card purple">
+      <h3>Sysdig Secure</h3>
+      <ul>
+        <li>Commercial runtime protection</li>
+        <li>Drift detection</li>
+        <li>Forensic capture</li>
+        <li>Compliance reporting</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <h3>Tracee</h3>
+      <ul>
+        <li>Aqua Security OSS tool</li>
+        <li>eBPF-based tracing</li>
+        <li>Detects container escapes</li>
+        <li>Signature-based detection</li>
+      </ul>
+    </div>
+  </div>
+  <pre><code class="language-yaml"># Falco rule example -- detect shell spawned in container
+- rule: Terminal Shell in Container
+  desc: Detect a shell spawned in a container
+  condition: >
+    spawned_process and container and proc.name in (bash, sh, zsh)
+  output: "Shell spawned in container (user=%user.name container=%container.name)"
+  priority: WARNING</code></pre>
+</section>
+
+<!-- ============ SLIDE 14 — DOCKER BENCH FOR SECURITY ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">13</span>
+    <h2>Docker Bench for Security</h2>
+  </div>
+  <p>An open-source script that checks your Docker host and containers against the <span class="a">CIS Docker Benchmark</span> -- dozens of automated checks.</p>
+  <pre><code class="language-bash"># Run Docker Bench for Security
+docker run --rm --net host --pid host --userns host --cap-add audit_control \
+  -e DOCKER_CONTENT_TRUST=$DOCKER_CONTENT_TRUST \
+  -v /var/lib:/var/lib:ro -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v /usr/lib/systemd:/usr/lib/systemd:ro -v /etc:/etc:ro \
+  docker/docker-bench-security</code></pre>
+  <div class="cols cols-2" style="margin-top:.2em;">
+    <div class="card green">
+      <h3>Categories Checked</h3>
+      <ul>
+        <li>Host configuration</li>
+        <li>Docker daemon configuration</li>
+        <li>Docker daemon config files</li>
+        <li>Container images and build files</li>
+        <li>Container runtime</li>
+        <li>Docker Security Operations</li>
+        <li>Docker Swarm configuration</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>Sample Output</h3>
+      <pre><code class="language-text">[PASS] 1.1 - Linux Kernel >= 4.x
+[WARN] 2.1 - Restrict network traffic
+[PASS] 4.1 - Image has non-root user
+[WARN] 5.4 - Privileged containers
+[INFO] 7.1 - Swarm mode enabled</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 15 — REGISTRY SECURITY ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">14</span>
+    <h2>Registry Security</h2>
+  </div>
+  <p>Your container registry is a <span class="r">critical supply chain component</span>. Secure it like any production system.</p>
+  <div class="cols cols-2">
+    <div class="card amber">
+      <h3>Access Control</h3>
+      <ul>
+        <li>Enforce RBAC -- least-privilege pull/push</li>
+        <li>Require authentication for all operations</li>
+        <li>Use short-lived tokens, not long-lived passwords</li>
+        <li>Enable audit logging on all registry access</li>
+        <li>Use TLS everywhere -- never plain HTTP</li>
+      </ul>
+    </div>
+    <div class="card green">
+      <h3>Image Policies</h3>
+      <ul>
+        <li>Enable automatic vulnerability scanning on push</li>
+        <li>Block deployment of images with critical CVEs</li>
+        <li>Use immutable tags to prevent overwrites</li>
+        <li>Set retention policies to remove old images</li>
+        <li>Allowlist approved base images only</li>
+      </ul>
+    </div>
+  </div>
+  <table style="margin-top:.2em;">
+    <tr><th>Registry</th><th>Scanning</th><th>Signing</th><th>RBAC</th></tr>
+    <tr><td>Docker Hub</td><td>Docker Scout</td><td>DCT / Cosign</td><td>Teams & Orgs</td></tr>
+    <tr><td>GitHub GHCR</td><td>Dependabot</td><td>Cosign</td><td>Org-level</td></tr>
+    <tr><td>AWS ECR</td><td>Inspector</td><td>Cosign / Notation</td><td>IAM Policies</td></tr>
+    <tr><td>Harbor (OSS)</td><td>Trivy built-in</td><td>Cosign / Notation</td><td>Fine-grained</td></tr>
+  </table>
+</section>
+
+<!-- ============ SLIDE 16 — SUPPLY CHAIN SECURITY ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">15</span>
+    <h2>Supply Chain Security</h2>
+  </div>
+  <p>Secure every link in the chain from source code to running container using <span class="g">SLSA</span> and <span class="p">SBOM</span> frameworks.</p>
+  <div class="ss-row">
+    <span class="ss-node done">Source</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node done">Build</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node active">Attest</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node">Sign</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node">Verify</span>
+    <span class="ss-arrow">&#x2192;</span>
+    <span class="ss-node">Deploy</span>
+  </div>
+  <div class="cols cols-2" style="margin-top:.2em;">
+    <div class="card purple">
+      <h3>SBOM (Software Bill of Materials)</h3>
+      <ul>
+        <li>Generate with <code>syft</code>, <code>trivy</code>, or <code>docker sbom</code></li>
+        <li>Formats: SPDX, CycloneDX</li>
+        <li>Attach to images as attestations</li>
+        <li>Required by US Executive Order 14028</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <h3>SLSA Framework (Levels 1-4)</h3>
+      <ul>
+        <li><span class="g">L1:</span> Build process documented</li>
+        <li><span class="g">L2:</span> Signed provenance from hosted build</li>
+        <li><span class="a">L3:</span> Hardened, isolated build platform</li>
+        <li><span class="r">L4:</span> Hermetic, reproducible builds</li>
+      </ul>
+    </div>
+  </div>
+  <pre><code class="language-bash"># Generate SBOM with Syft
+syft myapp:latest -o spdx-json > sbom.spdx.json
+
+# Attach SBOM attestation with Cosign
+cosign attest --predicate sbom.spdx.json --type spdxjson \
+  --key cosign.key myregistry/myapp@sha256:abc...</code></pre>
+</section>
+
+<!-- ============ SLIDE 17 — ROOTLESS DOCKER ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">16</span>
+    <h2>Rootless Docker</h2>
+  </div>
+  <p>Run the entire Docker daemon and containers without <span class="r">root privileges</span> -- eliminating the most dangerous attack vector.</p>
+  <div class="cols cols-2">
+    <div class="card green">
+      <h3>How It Works</h3>
+      <ul>
+        <li>Docker daemon runs as a regular user</li>
+        <li>Uses <code>user namespaces</code> for UID remapping</li>
+        <li>Root inside container maps to unprivileged UID on host</li>
+        <li>Uses <code>slirp4netns</code> or <code>pasta</code> for networking</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>Limitations</h3>
+      <ul>
+        <li>Cannot bind to ports &lt;1024 without CAP</li>
+        <li>Some storage drivers not supported</li>
+        <li>AppArmor/SELinux profiles may need adjustment</li>
+        <li>Slightly higher networking overhead</li>
+      </ul>
+    </div>
+  </div>
+  <pre><code class="language-bash"># Install rootless Docker
+dockerd-rootless-setuptool.sh install
+
+# Verify rootless mode
+docker info --format '{{.SecurityOptions}}'
+# Output includes "rootless"
+
+# Set environment for rootless
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock</code></pre>
+</section>
+
+<!-- ============ SLIDE 18 — CIS DOCKER BENCHMARK ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">17</span>
+    <h2>CIS Docker Benchmark Highlights</h2>
+  </div>
+  <p>The <span class="a">CIS Docker Benchmark</span> provides a comprehensive set of recommendations for securing Docker in production.</p>
+  <table>
+    <tr><th>Section</th><th>Key Recommendations</th><th>Priority</th></tr>
+    <tr><td>1. Host Config</td><td>Keep host OS and Docker up to date, audit Docker files</td><td><span class="r">Critical</span></td></tr>
+    <tr><td>2. Daemon Config</td><td>Enable user namespace support, restrict network traffic</td><td><span class="r">Critical</span></td></tr>
+    <tr><td>3. Config Files</td><td>Set ownership/permissions on daemon files to root:root</td><td><span class="a">High</span></td></tr>
+    <tr><td>4. Images</td><td>Use trusted base images, scan for vulnerabilities, no secrets</td><td><span class="r">Critical</span></td></tr>
+    <tr><td>5. Runtime</td><td>No privileged containers, drop capabilities, read-only FS</td><td><span class="r">Critical</span></td></tr>
+    <tr><td>6. Operations</td><td>Avoid image sprawl, use centralised logging</td><td><span class="a">High</span></td></tr>
+    <tr><td>7. Swarm</td><td>Encrypt overlay networks, rotate join tokens</td><td><span class="g">Medium</span></td></tr>
+  </table>
+  <p style="margin-top:.2em;"><span class="b">Automation:</span> Use <code>docker-bench-security</code> and integrate CIS checks into CI/CD pipelines.</p>
+</section>
+
+<!-- ============ SLIDE 19 — SUMMARY & FURTHER READING ============ -->
+<section>
+  <div class="slide-hdr">
+    <span class="tag">18</span>
+    <h2>Summary &amp; Further Reading</h2>
+  </div>
+  <div class="cols cols-2">
+    <div class="card green">
+      <h3>Key Takeaways</h3>
+      <ul>
+        <li>Start with <span class="g">minimal, scanned base images</span></li>
+        <li>Run as <span class="a">non-root</span> with <span class="a">read-only filesystems</span></li>
+        <li>Drop <span class="p">all capabilities</span>, add only what is needed</li>
+        <li>Never bake <span class="r">secrets</span> into images</li>
+        <li>Sign images and verify in CI/CD</li>
+        <li>Monitor runtime with Falco or equivalent</li>
+        <li>Audit regularly with CIS benchmarks</li>
+        <li>Consider <span class="b">rootless Docker</span> for defence in depth</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <h3>Resources</h3>
+      <ul>
+        <li><a href="https://docs.docker.com/engine/security/" style="color:var(--blue);">Docker Security Documentation</a></li>
+        <li><a href="https://www.cisecurity.org/benchmark/docker" style="color:var(--blue);">CIS Docker Benchmark</a></li>
+        <li><a href="https://falco.org/" style="color:var(--blue);">Falco Runtime Security</a></li>
+        <li><a href="https://aquasecurity.github.io/trivy/" style="color:var(--blue);">Trivy Vulnerability Scanner</a></li>
+        <li><a href="https://www.sigstore.dev/" style="color:var(--blue);">Sigstore / Cosign</a></li>
+        <li><a href="https://slsa.dev/" style="color:var(--blue);">SLSA Framework</a></li>
+        <li><a href="https://github.com/docker/docker-bench-security" style="color:var(--blue);">Docker Bench for Security</a></li>
+        <li><a href="https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html" style="color:var(--blue);">OWASP Docker Cheat Sheet</a></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+<script>
+Reveal.initialize({ hash:true, slideNumber:'c/t', transition:'fade', transitionSpeed:'fast', controls:true, progress:true, center:false, width:1100, height:900, margin:0.01, plugins:[RevealHighlight], highlight:{theme:'monokai'} });
+</script>
+<script>
+(function(){ var h=Reveal.getConfig().height||900; var m=Reveal.getConfig().margin||0.02; var maxH=Math.floor(h*(1-2*m))+'px'; function fixSlides(){ document.querySelectorAll('.reveal .slides>section,.reveal .slides>section>section').forEach(function(s){ s.style.display='block'; s.style.maxHeight=maxH; }); } Reveal.on('ready',fixSlides); Reveal.on('slidechanged',fixSlides); })();
+</script>
+</body></html>
